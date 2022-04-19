@@ -5,3 +5,4 @@ tp2
 proto/__init__.py
 *.zip
 /rapport.pdf
+/data/

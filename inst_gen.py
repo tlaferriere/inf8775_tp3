@@ -47,13 +47,13 @@ if __name__ == "__main__":
     
     
     for num in range(args.nb_exemplaires):
-        densite = random.random()/3+0.5
+        densite = 0.2
         NB_ARRETES = 0
         # Generation matrice adjacence
         adj = np.zeros((args.taille,args.taille))
         for i in range(args.taille):
             for j in range(i+1,args.taille):
-                if random.random() < 0.7:
+                if random.random() < densite:
                     adj[i,j] = 1
                     adj[j,i] = 1
                     NB_ARRETES +=1
@@ -63,18 +63,20 @@ if __name__ == "__main__":
         sec = 1
         comp = []
         pile = [0]
+        connex[0] = 1
         while True:
             while pile:
-                ele = pile.pop()
+                ele = pile.pop(0)
                 comp.append(ele)
-                connex[ele] = 1
                 for j in range(args.taille):
                     if (adj[ele,j] and connex[j] == 0):
+                        connex[j] = 1
                         pile.append(j)
 
             if len(comp) < args.taille:
-                for autre in range(sec,args.taille):
+                for autre in range(args.taille):
                     if connex[autre] == 0:
+                        connex[autre] = 1
                         sec = autre
                         break
                 pre = comp[random.randint(0,len(comp)-1)]
@@ -86,7 +88,7 @@ if __name__ == "__main__":
                 pile.append(sec)
             else:
                 break
-
+                
         # K Types
         K_type = [0]*args.types
         for _ in range(args.taille):

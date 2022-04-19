@@ -25,7 +25,7 @@ EXAMPLE_OUT_PREFIX := $(if $(DATA_DIR),$(DATA_DIR)/)O
 # BUILD BIN
 ########################################
 .PHONY: all
-all: tp2
+all: tp3
 
 ########################################
 # CREATE REMISE ARCHIVE
@@ -43,7 +43,7 @@ remise: 1905759.zip
 ########################################
 # BUILD GO BINARY
 ########################################
-$(GO_BIN): $(GO_SRCS) generate-pb-go
+$(GO_BIN): $(GO_SRCS)
 	go build -o $(GO_BIN)
 
 ########################################
