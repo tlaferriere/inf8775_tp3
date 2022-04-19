@@ -20,7 +20,6 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 	go sortNodes(t, graphMapChan, mapOut, prioNodes)
 
 	// Placer les arêtes les moins énergisantes en premier dans le graphe sur les noeuds les plus connectés en premier
-	energy := 0
 	occupied := make([]bool, t)
 	nodes := make([]uint, t)
 	prioIdx := 0 // Pour résumer l'itération dans la liste des noeuds prioritaires
@@ -39,7 +38,6 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 			otherAtom = e[0]
 			nOtherAtoms = nAtoms[e[0]]
 		}
-		currentEnergy := h[limitingAtom][otherAtom]
 		sameAtom := limitingAtom == otherAtom
 		if nLimitingAtoms > 0 && nOtherAtoms > 0 { // S'assurer que les deux atomes sont encore présents
 
@@ -60,7 +58,6 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 						if !occupied[o] {
 							nodes[o] = otherAtom
 							occupied[o] = true
-							energy += currentEnergy
 							if sameAtom {
 								nLimitingAtoms--
 								if nLimitingAtoms == 0 {
@@ -72,8 +69,6 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 									break
 								}
 							}
-						} else {
-							energy += h[nodes[o]][limitingAtom]
 						}
 					}
 					// Mise à jour du nombre d'atomes restant
@@ -96,13 +91,15 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 				if nAtoms[a] > 0 {
 					nodes[i] = uint(a)
 					nAtoms[a]--
-					for _, n := range graphMap[i] {
-						energy += h[a][nodes[n]]
-					}
 					break
 				}
 			}
 		}
+	}
+
+	energy := 0
+	for _, e := range edges {
+		energy += h[nodes[e[0]]][nodes[e[1]]]
 	}
 	return energy, nodes, graphMap
 }
