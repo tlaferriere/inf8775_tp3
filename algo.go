@@ -10,9 +10,10 @@ import (
 //  - e: energie totale
 //	- nodes: le tableau de tous les sommets
 func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]uint) {
-	possibleEdges := make(chan [][2]uint)
 	graphMapChan := make(chan [][]uint)
 	go makeGraphMap(edges, t, graphMapChan)
+
+	possibleEdges := make(chan [][2]uint)
 	go sortEdges(nAtoms, h, possibleEdges)
 
 	prioNodes := make(chan []uint)
@@ -84,6 +85,7 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 			}
 		}
 	}
+
 	for i, o := range occupied {
 		// Remplir les trous restants
 		if !o {
@@ -97,6 +99,7 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 		}
 	}
 
+	// Calculer l'énergie totale
 	energy := 0
 	for _, e := range edges {
 		energy += h[nodes[e[0]]][nodes[e[1]]]
