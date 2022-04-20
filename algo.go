@@ -159,6 +159,7 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 	// Faire une recherche avec un voisinage d'un certain nombre de
 	// changements d'atomes aléatoires et répéter avec le meilleur résultat.
 	// Renvoyer les solutions globalement meilleures dans improvedSol
+	rand.Seed(time.Now().UnixNano())
 	nIters := t
 	nextSol := solution{energy: startSol.energy, nodes: make([]uint, t)}
 	copy(nextSol.nodes, startSol.nodes)
@@ -167,7 +168,6 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 		bestSwap := [2]uint{0, 0}
 		for i := uint(0); i < nIters; i++ {
 			// Choisir deux atomes aléatoirement
-			rand.Seed(time.Now().UnixNano())
 			swapIdx1 := rand.Intn(int(t))
 			swapIdx2 := rand.Intn(int(t))
 			for swapIdx1 == swapIdx2 {
