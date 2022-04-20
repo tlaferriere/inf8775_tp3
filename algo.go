@@ -142,14 +142,16 @@ func improve(startSol solution, t uint, h [][]int, edges [][2]uint, graphMap [][
 	// Récupérer les solutions améliorantes
 	bestSol := startSol
 	for sol := range localImprovedSol {
-		newEnergy := 0
+		energy := 0
 		// Ne pas faire confiance à la solution car c'est une heuristique peu précise
+		nodes := make([]uint, t)
+		copy(nodes, sol.nodes)
 		for _, e := range edges {
-			newEnergy += h[sol.nodes[e[0]]][sol.nodes[e[1]]]
+			energy += h[nodes[e[0]]][nodes[e[1]]]
 		}
-		if newEnergy < bestSol.energy {
-			bestSol = sol
-			bestSol.energy = newEnergy
+		if energy < bestSol.energy {
+			bestSol.energy = energy
+			bestSol.nodes = nodes
 			improvedSol <- bestSol
 		}
 	}
@@ -160,40 +162,42 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 	// changements d'atomes aléatoires et répéter avec le meilleur résultat.
 	// Renvoyer les solutions globalement meilleures dans improvedSol
 	rand.Seed(time.Now().UnixNano())
-	nIters := t
+	nIters := uint(500)
 	nextSol := solution{energy: startSol.energy, nodes: make([]uint, t)}
 	copy(nextSol.nodes, startSol.nodes)
 	for {
 		bestDelta := math.MaxInt
 		bestSwap := [2]uint{0, 0}
+		prevSwap := [2]uint{0, 0}
 		for i := uint(0); i < nIters; i++ {
 			// Choisir deux atomes aléatoirement
-			swapIdx1 := rand.Intn(int(t))
-			swapIdx2 := rand.Intn(int(t))
-			for swapIdx1 == swapIdx2 {
-				swapIdx2 = rand.Intn(int(t))
+			swap := [2]uint{uint(rand.Intn(int(t))), uint(rand.Intn(int(t)))}
+			// Ne pas échanger un noeud avec lui-même ou inverser le changement précédent
+			for swap[0] == swap[1] || (swap[0] == prevSwap[0] && swap[1] == prevSwap[1]) || (swap[0] == prevSwap[1] && swap[1] == prevSwap[0]) {
+				swap[1] = uint(rand.Intn(int(t)))
 			}
 			// Calculer l'énergie des deux atomes
 			before := 0
-			for _, n := range graphMap[swapIdx1] {
-				before += h[nextSol.nodes[swapIdx1]][nextSol.nodes[n]]
+			for _, n := range graphMap[swap[0]] {
+				before += h[nextSol.nodes[swap[0]]][nextSol.nodes[n]]
 			}
-			for _, n := range graphMap[swapIdx2] {
-				before += h[nextSol.nodes[swapIdx2]][nextSol.nodes[n]]
+			for _, n := range graphMap[swap[1]] {
+				before += h[nextSol.nodes[swap[1]]][nextSol.nodes[n]]
 			}
 			after := 0
-			for _, n := range graphMap[swapIdx1] {
-				after += h[nextSol.nodes[swapIdx2]][nextSol.nodes[n]]
+			for _, n := range graphMap[swap[0]] {
+				after += h[nextSol.nodes[swap[1]]][nextSol.nodes[n]]
 			}
-			for _, n := range graphMap[swapIdx2] {
-				after += h[nextSol.nodes[swapIdx1]][nextSol.nodes[n]]
+			for _, n := range graphMap[swap[1]] {
+				after += h[nextSol.nodes[swap[0]]][nextSol.nodes[n]]
 			}
 			// Mettre à jour le meilleur changement
 			delta := after - before // Cette heuristique est peu précise
 			if delta < bestDelta {
 				bestDelta = delta
-				bestSwap = [2]uint{uint(swapIdx1), uint(swapIdx2)}
+				bestSwap = swap
 			}
+			prevSwap = swap
 		}
 		// Appliquer le meilleur changement
 		nextSol.nodes[bestSwap[0]], nextSol.nodes[bestSwap[1]] = nextSol.nodes[bestSwap[1]], nextSol.nodes[bestSwap[0]]
