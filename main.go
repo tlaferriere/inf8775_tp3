@@ -3,9 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"runtime"
 )
 
 func main() {
+
+	// Enable parallelism
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	var (
 		// startAlgoName   = flag.String("a", "start", "Algorithme de départ")
@@ -15,31 +19,29 @@ func main() {
 	)
 	flag.Parse()
 	t, nAtoms, h, edges := readProb(*exemplairesPath)
-	e, sol, graphMap := start(t, nAtoms, h, edges)
+
+	sol, graphMap := start(t, nAtoms, h, edges)
 	if *printSol {
-		for _, a := range sol {
+		for _, a := range sol.nodes {
 			fmt.Printf("%v ", a)
 		}
 		fmt.Printf("\n")
 	} else {
-		print(e)
+		println(sol.energy)
 	}
 
-	return
-
-	improvedEnergy := make(chan int)
-	improvedSolution := make(chan []uint)
-	go improve(e, sol, t, nAtoms, h, graphMap, *printSol, improvedEnergy, improvedSolution)
+	improvedSol := make(chan solution)
+	go improve(sol, t, h, edges, graphMap, improvedSol)
 	if *printSol {
-		for sol := range improvedSolution {
-			for _, a := range sol {
+		for sol := range improvedSol {
+			for _, a := range sol.nodes {
 				fmt.Printf("%v ", a)
 			}
 			fmt.Printf("\n")
 		}
 	} else {
-		for e := range improvedEnergy {
-			print(e)
+		for sol := range improvedSol {
+			println(sol.energy)
 		}
 	}
 }

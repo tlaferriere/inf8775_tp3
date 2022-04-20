@@ -1,15 +1,24 @@
 package main
 
 import (
+	"math"
+	"math/rand"
+	"runtime"
 	"sort"
+	"time"
 )
+
+type solution struct {
+	energy int
+	nodes  []uint
+}
 
 // Départ start
 // On remplit le tableau de tous les sommets
 // Return: (e uint, nodes []uint)
 //  - e: energie totale
 //	- nodes: le tableau de tous les sommets
-func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]uint) {
+func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (solution, [][]uint) {
 	graphMapChan := make(chan [][]uint)
 	go makeGraphMap(edges, t, graphMapChan)
 
@@ -104,10 +113,10 @@ func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (int, []uint, [][]
 	for _, e := range edges {
 		energy += h[nodes[e[0]]][nodes[e[1]]]
 	}
-	return energy, nodes, graphMap
+	return solution{energy: energy, nodes: nodes}, graphMap
 }
 
-func sortNodes(t uint, mapIn chan [][]uint, mapOut chan [][]uint, nodes chan []uint) {
+func sortNodes(t uint, mapIn <-chan [][]uint, mapOut chan<- [][]uint, nodes chan<- []uint) {
 	prioNodes := make([]uint, t)
 	for i := uint(0); i < t; i++ {
 		prioNodes[i] = i
@@ -117,7 +126,83 @@ func sortNodes(t uint, mapIn chan [][]uint, mapOut chan [][]uint, nodes chan []u
 		return len(d[i]) > len(d[j])
 	})
 	mapOut <- d
+	close(mapOut)
 	nodes <- prioNodes
+	close(nodes)
+}
+
+func improve(startSol solution, t uint, h [][]int, edges [][2]uint, graphMap [][]uint, improvedSol chan<- solution) {
+
+	// Démarrer quelques fils
+	localImprovedSol := make(chan solution, runtime.NumCPU())
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go randomSearch(startSol, t, h, graphMap, localImprovedSol)
+	}
+
+	// Récupérer les solutions améliorantes
+	bestSol := startSol
+	for sol := range localImprovedSol {
+		newEnergy := 0
+		// Ne pas faire confiance à la solution car c'est une heuristique peu précise
+		for _, e := range edges {
+			newEnergy += h[sol.nodes[e[0]]][sol.nodes[e[1]]]
+		}
+		if newEnergy < bestSol.energy {
+			bestSol = sol
+			bestSol.energy = newEnergy
+			improvedSol <- bestSol
+		}
+	}
+}
+
+func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, improvedSol chan<- solution) {
+	// Faire une recherche avec un voisinage d'un certain nombre de
+	// changements d'atomes aléatoires et répéter avec le meilleur résultat.
+	// Renvoyer les solutions globalement meilleures dans improvedSol
+	nIters := t
+	nextSol := solution{energy: startSol.energy, nodes: make([]uint, t)}
+	copy(nextSol.nodes, startSol.nodes)
+	for {
+		bestDelta := math.MaxInt
+		bestSwap := [2]uint{0, 0}
+		for i := uint(0); i < nIters; i++ {
+			// Choisir deux atomes aléatoirement
+			rand.Seed(time.Now().UnixNano())
+			swapIdx1 := rand.Intn(int(t))
+			swapIdx2 := rand.Intn(int(t))
+			for swapIdx1 == swapIdx2 {
+				swapIdx2 = rand.Intn(int(t))
+			}
+			// Calculer l'énergie des deux atomes
+			before := 0
+			for _, n := range graphMap[swapIdx1] {
+				before += h[nextSol.nodes[swapIdx1]][nextSol.nodes[n]]
+			}
+			for _, n := range graphMap[swapIdx2] {
+				before += h[nextSol.nodes[swapIdx2]][nextSol.nodes[n]]
+			}
+			after := 0
+			for _, n := range graphMap[swapIdx1] {
+				after += h[nextSol.nodes[swapIdx2]][nextSol.nodes[n]]
+			}
+			for _, n := range graphMap[swapIdx2] {
+				after += h[nextSol.nodes[swapIdx1]][nextSol.nodes[n]]
+			}
+			// Mettre à jour le meilleur changement
+			delta := after - before // Cette heuristique est peu précise
+			if delta < bestDelta {
+				bestDelta = delta
+				bestSwap = [2]uint{uint(swapIdx1), uint(swapIdx2)}
+			}
+		}
+		// Appliquer le meilleur changement
+		nextSol.nodes[bestSwap[0]], nextSol.nodes[bestSwap[1]] = nextSol.nodes[bestSwap[1]], nextSol.nodes[bestSwap[0]]
+		nextSol.energy += bestDelta
+		if bestDelta < 0 {
+			// Si le changement est positif, renvoyer la solution
+			improvedSol <- nextSol
+		}
+	}
 }
 
 func sortEdges(nAtoms []uint, h [][]int, sortedEdges chan [][2]uint) {
@@ -154,29 +239,6 @@ func sortEdges(nAtoms []uint, h [][]int, sortedEdges chan [][2]uint) {
 	close(sortedEdges)
 }
 
-type nodeEdges struct {
-	id    uint
-	edges []bool
-}
-
-type nodeDegree struct {
-	id     uint
-	degree uint
-}
-
-// Count all true values in a boolean array
-func edgeCounter(edges chan nodeEdges, degrees chan nodeDegree) {
-	for n := range edges {
-		var nEdges uint
-		for _, e := range n.edges {
-			if e {
-				nEdges++
-			}
-		}
-		degrees <- nodeDegree{n.id, nEdges}
-	}
-}
-
 // Retourne une liste des noeuds connectés à chaque noeud
 func makeGraphMap(edges [][2]uint, t uint, eMap chan [][]uint) {
 	mapping := make([][]uint, t)
@@ -188,13 +250,4 @@ func makeGraphMap(edges [][2]uint, t uint, eMap chan [][]uint) {
 		mapping[e[1]] = append(mapping[e[1]], e[0])
 	}
 	eMap <- mapping
-}
-
-func improve(e int, sol []uint, t uint, nAtoms []uint, h [][]int, graphMap [][]uint, printSol bool, improvedEnergy chan int, improvedSol chan []uint) (uint, []uint) {
-	if printSol {
-		close(improvedEnergy)
-	} else {
-		close(improvedSol)
-	}
-	return 0, make([]uint, t)
 }
