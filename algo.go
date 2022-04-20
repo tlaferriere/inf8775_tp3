@@ -20,7 +20,7 @@ type solution struct {
 //	- nodes: le tableau de tous les sommets
 func start(t uint, nAtoms []uint, h [][]int, edges [][2]uint) (solution, [][]uint) {
 	graphMapChan := make(chan [][]uint)
-	go makeGraphMap(edges, t, graphMapChan)
+	go makeGraphMap(edges, t, graphMapChan) // theta(n) se fait dominer par theta(n log n) des tris suivants
 
 	possibleEdges := make(chan [][2]uint)
 	go sortEdges(nAtoms, h, possibleEdges)
@@ -133,7 +133,7 @@ func sortNodes(t uint, mapIn <-chan [][]uint, mapOut chan<- [][]uint, nodes chan
 
 func improve(startSol solution, t uint, h [][]int, edges [][2]uint, graphMap [][]uint, improvedSol chan<- solution) {
 
-	// Démarrer quelques fils
+	// Démarrer quelques fils pour parcourir l'espace de recherche sur plusieurs fronts en parallèle
 	localImprovedSol := make(chan solution, runtime.NumCPU())
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go randomSearch(startSol, t, h, graphMap, localImprovedSol)
@@ -173,7 +173,11 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 			// Choisir deux atomes aléatoirement
 			swap := [2]uint{uint(rand.Intn(int(t))), uint(rand.Intn(int(t)))}
 			// Ne pas échanger un noeud avec lui-même ou inverser le changement précédent
-			for swap[0] == swap[1] || (swap[0] == prevSwap[0] && swap[1] == prevSwap[1]) || (swap[0] == prevSwap[1] && swap[1] == prevSwap[0]) {
+			// Ne pas echanger un noeud avec un noeud ayant le même atome
+			for swap[0] == swap[1] ||
+				(swap[0] == prevSwap[0] && swap[1] == prevSwap[1]) ||
+				(swap[0] == prevSwap[1] && swap[1] == prevSwap[0]) ||
+				nextSol.nodes[swap[0]] == nextSol.nodes[swap[1]] {
 				swap[1] = uint(rand.Intn(int(t)))
 			}
 			// Calculer l'énergie des deux atomes
@@ -246,9 +250,6 @@ func sortEdges(nAtoms []uint, h [][]int, sortedEdges chan [][2]uint) {
 // Retourne une liste des noeuds connectés à chaque noeud
 func makeGraphMap(edges [][2]uint, t uint, eMap chan [][]uint) {
 	mapping := make([][]uint, t)
-	for i := uint(0); i < t; i++ {
-		mapping[i] = make([]uint, 1)
-	}
 	for _, e := range edges {
 		mapping[e[0]] = append(mapping[e[0]], e[1])
 		mapping[e[1]] = append(mapping[e[1]], e[0])
