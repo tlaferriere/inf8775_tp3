@@ -165,10 +165,10 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 	nIters := uint(500)
 	nextSol := solution{energy: startSol.energy, nodes: make([]uint, t)}
 	copy(nextSol.nodes, startSol.nodes)
+	prevSwap := [2]uint{0, 0}
 	for {
 		bestDelta := math.MaxInt
 		bestSwap := [2]uint{0, 0}
-		prevSwap := [2]uint{0, 0}
 		for i := uint(0); i < nIters; i++ {
 			// Choisir deux atomes aléatoirement
 			swap := [2]uint{uint(rand.Intn(int(t))), uint(rand.Intn(int(t)))}
@@ -201,8 +201,8 @@ func randomSearch(startSol solution, t uint, h [][]int, graphMap [][]uint, impro
 				bestDelta = delta
 				bestSwap = swap
 			}
-			prevSwap = swap
 		}
+		prevSwap = bestSwap
 		// Appliquer le meilleur changement
 		nextSol.nodes[bestSwap[0]], nextSol.nodes[bestSwap[1]] = nextSol.nodes[bestSwap[1]], nextSol.nodes[bestSwap[0]]
 		nextSol.energy += bestDelta
